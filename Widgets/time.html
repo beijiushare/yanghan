@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>不规则数字时钟</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
+    <script src="https://libs.baidu.com/jquery/2.1.4/jquery.min.js"></script>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden
+        }
+
+        canvas {
+            position: fixed;
+            left: 0;
+            top: 0;
+            transform-origin: 0 0
+        }
+    </style>
+</head>
+
+<body>
+<canvas id="canvas" class="canvas"></canvas>
+</body>
+<script>
+    "use strict";
+
+    function CalDistance(a, b) {
+        return Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y))
+    }
+
+    var canvas = document.querySelector('#canvas');
+    var ctx = canvas.getContext("2d");
+    var FullWidth, FullHeight, FullMinSize, NormalWidth, NormalHeight, NormalMinSize;
+
+    function WindowResize() {
+        FullWidth = window.innerWidth * window.devicePixelRatio;
+        FullHeight = window.innerHeight * window.devicePixelRatio;
+        var tcanvas = document.querySelectorAll('.canvas');
+        for (var i = 0; i < tcanvas.length; i++) {
+            tcanvas[i].style = 'transform: scale(' + 1 / window.devicePixelRatio + ')';
+            tcanvas[i].style.width = FullWidth + 'px';
+            tcanvas[i].style.height = FullHeight + 'px';
+            tcanvas[i].width = FullWidth;
+            tcanvas[i].height = FullHeight
+        }
+        NormalWidth = FullWidth / 100;
+        NormalHeight = FullHeight / 100;
+        FullMinSize = Math.min(FullWidth, FullHeight);
+        NormalMinSize = Math.min(NormalWidth, NormalHeight)
+    }
+
+    WindowResize();
+    window.onresize = function () {
+        WindowResize()
+    };
+    var NumberPointsModel = [];
+    NumberPointsModel.push([[-0.5, -1], [-0.5, -1], [-0.5, -1], [-0.5, -1], [-0.5, -1], [-0.5, 1], [0.5, 1], [0.5, -1], [-0.5, -1]]);
+    NumberPointsModel.push([[0.5, -1], [0.5, -1], [0.5, -1], [0.5, -1], [0.5, -1], [0.5, -1], [0.5, -1], [0.5, -1], [0.5, 1]]);
+    NumberPointsModel.push([[-0.5, -1], [-0.5, -1], [-0.5, -1], [-0.5, -1], [-0.5, -1], [-0.5, -1], [0.5, -1], [-0.5, 1], [0.5, 1]]);
+    NumberPointsModel.push([[-0.5, -1], [-0.5, -1], [-0.5, -1], [0.5, -1], [0.5, 0], [-0.5, 0], [0.5, 0], [0.5, 1], [-0.5, 1]]);
+    NumberPointsModel.push([[-0.5, -1], [-0.5, -1], [-0.5, -1], [-0.5, -1], [-0.5, -1], [-0.5, 0], [0.5, 0], [0, -1], [0, 1]]);
+    NumberPointsModel.push([[0.5, -1], [0.5, -1], [0.5, -1], [-0.5, -1], [-0.5, -1], [-0.5, 0], [0.5, 0], [0.5, 1], [-0.5, 1]]);
+    NumberPointsModel.push([[0.5, -1], [0.5, -1], [0.5, -1], [0.5, -1], [-0.5, 0], [-0.5, 1], [0.5, 1], [0.5, 0], [-0.5, 0]]);
+    NumberPointsModel.push([[-0.5, -1], [-0.5, -1], [-0.5, -1], [-0.5, -1], [-0.5, -1], [0.5, -1], [0.5, -1], [0.5, 0], [0.5, 1]]);
+    NumberPointsModel.push([[0.5, -1], [-0.5, -1], [-0.5, 0], [0.5, 0], [0.5, 1], [-0.5, 1], [-0.5, 0], [0.5, 0], [0.5, -1]]);
+    NumberPointsModel.push([[0.5, 0], [0.5, 0], [0.5, 0], [0.5, 0], [-0.5, 0], [-0.5, -1], [0.5, -1], [0.5, 0], [-0.5, 1]]);
+    var Points = [];
+    var OldPoints = [];
+    var DisplayPoints = [];
+    var LastTime = [0, 0, 0, 0, 0, 0];
+    var LastDrawTime = -1;
+
+    function IniPoints(Index) {
+        OldPoints = structuredClone(Points);
+        Points = [];
+        for (var i = 0; i < NumberPointsModel[Index].length; i++) {
+            Points.push({x: NumberPointsModel[Index][i][0], y: NumberPointsModel[Index][i][1]})
+        }
+    }
+
+    function CalDisplayPoints(K) {
+        if (K > 1) K = 1;
+        DisplayPoints = [];
+        for (var i = 0; i < Points.length; i++) {
+            DisplayPoints.push({
+                x: OldPoints[i].x + K * (Points[i].x - OldPoints[i].x),
+                y: OldPoints[i].y + K * (Points[i].y - OldPoints[i].y),
+            })
+        }
+    }
+
+    function DisplayPointsDraw(DrawSize) {
+        var ControlPoint = [];
+        for (var i = 0; i < DisplayPoints.length; i++) {
+            ControlPoint[i] = [];
+            var BeforePoints, AfterPoints;
+            if (i != 0) {
+                BeforePoints = DisplayPoints[i - 1]
+            } else {
+                BeforePoints = DisplayPoints[DisplayPoints.length - 1]
+            }
+            if (i != DisplayPoints.length - 1) {
+                AfterPoints = DisplayPoints[i + 1]
+            } else {
+                AfterPoints = DisplayPoints[0]
+            }
+            var ParaDirection = {x: AfterPoints.x - BeforePoints.x, y: AfterPoints.y - BeforePoints.y};
+            var ParaDirectionLength = CalDistance(BeforePoints, AfterPoints);
+            if (ParaDirectionLength == 0) {
+                ControlPoint[i].push({x: DisplayPoints[i].x, y: DisplayPoints[i].y});
+                ControlPoint[i].push({x: DisplayPoints[i].x, y: DisplayPoints[i].y});
+                continue
+            }
+            ParaDirection.x /= ParaDirectionLength;
+            ParaDirection.y /= ParaDirectionLength;
+            var MinSide = -1;
+            var Side = [];
+            Side.push(CalDistance(DisplayPoints[i], BeforePoints));
+            Side.push(CalDistance(DisplayPoints[i], AfterPoints));
+            Side.push(CalDistance(BeforePoints, AfterPoints));
+            for (var j = 0; j < Side.length; j++) {
+                if (j == 0 || Side[j] < MinSide) {
+                    MinSide = Side[j]
+                }
+            }
+            MinSide /= 2;
+            ControlPoint[i].push({
+                x: DisplayPoints[i].x - ParaDirection.x * MinSide,
+                y: DisplayPoints[i].y - ParaDirection.y * MinSide
+            });
+            ControlPoint[i].push({
+                x: DisplayPoints[i].x + ParaDirection.x * MinSide,
+                y: DisplayPoints[i].y + ParaDirection.y * MinSide
+            })
+        }
+        ctx.beginPath();
+        ctx.moveTo(DrawSize * DisplayPoints[0].x, DrawSize * DisplayPoints[0].y);
+        for (var i = 1; i <= DisplayPoints.length; i++) {
+            var cp1x, cp1y, cp2x, cp2y, tx, ty;
+            if (i != DisplayPoints.length) {
+                cp1x = ControlPoint[i - 1][1].x;
+                cp1y = ControlPoint[i - 1][1].y;
+                cp2x = ControlPoint[i][0].x;
+                cp2y = ControlPoint[i][0].y;
+                tx = DisplayPoints[i].x;
+                ty = DisplayPoints[i].y
+            } else {
+                continue
+            }
+            ctx.bezierCurveTo(DrawSize * cp1x, DrawSize * cp1y, DrawSize * cp2x, DrawSize * cp2y, DrawSize * tx, DrawSize * ty)
+        }
+        ctx.stroke()
+    }
+
+    function DrawTime() {
+        var NowTime = new Date();
+        var Hour = "" + NowTime.getHours();
+        if (Hour.length < 2) Hour = "0" + Hour;
+        var Miniute = "" + NowTime.getMinutes();
+        if (Miniute.length < 2) Miniute = "0" + Miniute;
+        var Second = "" + NowTime.getSeconds();
+        if (Second.length < 2) Second = "0" + Second;
+        var NewTime = [];
+        NewTime.push(Hour[0]);
+        NewTime.push(Hour[1]);
+        NewTime.push(Miniute[0]);
+        NewTime.push(Miniute[1]);
+        NewTime.push(Second[0]);
+        NewTime.push(Second[1]);
+        var Changed = false;
+        for (var i = 0; i < NewTime.length; i++) {
+            if (NewTime[i] == LastTime[i]) continue;
+            Changed = true;
+            break
+        }
+        var NewDrawTime = Date.now();
+        var AnimationK = (NewDrawTime % 1000) / 1000 * 1.2;
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, FullWidth, FullHeight);
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        var DrawSize = NormalWidth * 6;
+        ctx.lineWidth = DrawSize / 6;
+
+        function DrawTimeNumber(Index, Left) {
+            ctx.setTransform(1, 0, 0, 1, FullWidth / 2 + Left * DrawSize * 1.5, FullHeight / 2);
+            IniPoints(LastTime[Index]);
+            IniPoints(NewTime[Index]);
+            CalDisplayPoints(AnimationK);
+            DisplayPointsDraw(DrawSize)
+        }
+
+        function DrawQ(Left) {
+            if (AnimationK < 0.6) return;
+            ctx.setTransform(1, 0, 0, 1, FullWidth / 2 + Left * DrawSize * 1.5, FullHeight / 2);
+            ctx.beginPath();
+            ctx.arc(0, -DrawSize / 4, DrawSize / 8, 0, Math.PI * 2);
+            ctx.arc(0, DrawSize / 4, DrawSize / 8, 0, Math.PI * 2);
+            ctx.fill()
+        }
+
+        DrawTimeNumber(0, -3.5);
+        DrawTimeNumber(1, -2.5);
+        DrawQ(-1.5);
+        DrawTimeNumber(2, -0.5);
+        DrawTimeNumber(3, 0.5);
+        DrawQ(1.5);
+        DrawTimeNumber(4, 2.5);
+        DrawTimeNumber(5, 3.5);
+        if (Changed && AnimationK > 1) {
+            LastTime = structuredClone(NewTime);
+            LastDrawTime = (Math.floor(NewDrawTime / 1000)) * 1000
+        }
+    }
+
+    function FrameCircle() {
+        DrawTime();
+        requestAnimationFrame(FrameCircle)
+    }
+
+    FrameCircle();
+</script>
+</html>
